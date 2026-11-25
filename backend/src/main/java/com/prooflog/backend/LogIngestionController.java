@@ -1,5 +1,6 @@
 package com.prooflog.backend;
 
+import com.prooflog.backend.service.LogBufferService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,7 +13,7 @@ import java.util.List;
 @CrossOrigin(origins = "http://localhost:3000")
 public class LogIngestionController {
 
-    private final ActivityLogRepository logRepository;
+    private final LogBufferService logBufferService;
 
     public record LogBatchRequest(
             String documentId,
@@ -25,12 +26,14 @@ public class LogIngestionController {
         if (request.events() == null || request.events().isEmpty()) {
             return ResponseEntity.ok().build();
         }
-        ActivityLog log = new ActivityLog(
+
+        // sequenceNum을 멱등성 키로 사용하여 중복 배치 방어 및 Redis 버퍼 적재
+        logBufferService.bufferLogBatch(
                 request.documentId(),
-                request.sequenceNum(),
-                request.events()
+                String.valueOf(request.sequenceNum()),
+                request
         );
-        logRepository.save(log);
+
         return ResponseEntity.accepted().build();
     }
 }
